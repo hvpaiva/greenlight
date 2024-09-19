@@ -24,6 +24,7 @@ type Config struct {
 	Version string
 	Debug   bool
 	DB      DB
+	Limiter Limiter
 }
 
 type DB struct {
@@ -31,6 +32,12 @@ type DB struct {
 	MaxOpenConns int
 	MaxIdleConns int
 	MaxIdleTime  time.Duration
+}
+
+type Limiter struct {
+	RPS     float64
+	Burst   int
+	Enabled bool
 }
 
 func NewApplication(db *sql.DB, cfg Config, logger *slog.Logger) *Application {
@@ -52,6 +59,10 @@ func InitConfig() Config {
 	flag.IntVar(&cfg.DB.MaxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.DB.MaxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.DurationVar(&cfg.DB.MaxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
+
+	flag.Float64Var(&cfg.Limiter.RPS, "limiter-rps", 2, "Rate limiter maximum requests per second")
+	flag.IntVar(&cfg.Limiter.Burst, "limiter-burst", 4, "Rate limiter maximum burst")
+	flag.BoolVar(&cfg.Limiter.Enabled, "limiter-enabled", true, "Enable rate limiter")
 
 	flag.Parse()
 
