@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
@@ -34,23 +32,7 @@ func main() {
 
 	app := rest.NewApplication(db, cfg, logger)
 
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      app.Routes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
-	}
-
-	logger.Info("starting server",
-		slog.String("version", cfg.Version),
-		slog.String("Env", cfg.Env),
-		slog.String("addr", srv.Addr),
-		slog.Bool("Debug", cfg.Debug),
-	)
-
-	if err := srv.ListenAndServe(); err != nil {
+	if err := serve(app); err != nil {
 		logger.Error("server failed to start", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
