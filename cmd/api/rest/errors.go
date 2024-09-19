@@ -118,3 +118,7 @@ func (a Application) HandleNotFound(w http.ResponseWriter, r *http.Request, mess
 func (a Application) HandleValidationErrors(w http.ResponseWriter, r *http.Request, err map[string]string) {
 	a.HandleErrors(w, r, "error validating request data", http.StatusUnprocessableEntity, err)
 }
+
+func (a Application) HandleConflict(w http.ResponseWriter, r *http.Request, message string, err error) {
+	a.HandleError(w, r, NewHttpErrorWithCause(message, http.StatusConflict, err))
+}

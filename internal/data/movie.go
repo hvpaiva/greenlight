@@ -17,6 +17,7 @@ type Movie struct {
 	Genres    []string  `json:"genres,omitempty"`
 	Runtime   Runtime   `json:"runtime,omitempty"`
 	CreatedAt time.Time `json:"-"`
+	Version   int32     `json:"-"`
 }
 
 func (m *Movie) Validate(v *validator.Validator) {
@@ -63,7 +64,7 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 	}
 
 	query := `
-		SELECT id, title, year, runtime, genres, created_at
+		SELECT id, title, year, runtime, genres, created_at, version
 		FROM movies
 		WHERE id = $1
 	`
@@ -77,6 +78,7 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 		&movie.Runtime,
 		pq.Array(&movie.Genres),
 		&movie.CreatedAt,
+		&movie.Version,
 	); err != nil {
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
@@ -92,9 +94,9 @@ func (m MovieModel) Get(id int64) (*Movie, error) {
 func (m MovieModel) Update(movie *Movie) error {
 	query := `
         UPDATE movies 
-        SET title = $1, year = $2, runtime = $3, genres = $4
-        WHERE id = $5
-        RETURNING id
+        SET title = $1, year = $2, runtime = $3, genres = $4, version = version + 1
+        WHERE id = $5 AND version = $6
+        RETURNING version
 	`
 
 	args := []any{
@@ -103,9 +105,19 @@ func (m MovieModel) Update(movie *Movie) error {
 		movie.Runtime,
 		pq.Array(movie.Genres),
 		movie.ID,
+		movie.Version,
 	}
 
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID)
+	if err := m.DB.QueryRow(query, args...).Scan(&movie.Version); err != nil {
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrEditConflict
+		default:
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (m MovieModel) Delete(id int64) error {

@@ -95,6 +95,16 @@ func (a Application) updateMovieHandler(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
+	if r.Header.Get("X-Expected-Version") != "" {
+		if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
+			a.HandleConflict(w, r,
+				"the expected version does not match the current version of the movie",
+				errors.New("version mismatch"),
+			)
+			return
+		}
+	}
+
 	var input struct {
 		Title   string       `json:"title"`
 		Year    int32        `json:"year"`
@@ -120,7 +130,12 @@ func (a Application) updateMovieHandler(w http.ResponseWriter, r *http.Request, 
 	}
 
 	if err = a.Models.Movies.Update(movie); err != nil {
-		a.HandleError(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			a.HandleConflict(w, r, "error while updating movie due to a conflict, please try again", err)
+		default:
+			a.HandleError(w, r, err)
+		}
 		return
 	}
 
@@ -146,6 +161,16 @@ func (a Application) patchMovieHandler(w http.ResponseWriter, r *http.Request, p
 			a.HandleError(w, r, err)
 		}
 		return
+	}
+
+	if r.Header.Get("X-Expected-Version") != "" {
+		if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
+			a.HandleConflict(w, r,
+				"the expected version does not match the current version of the movie",
+				errors.New("version mismatch"),
+			)
+			return
+		}
 	}
 
 	var input struct {
@@ -184,7 +209,12 @@ func (a Application) patchMovieHandler(w http.ResponseWriter, r *http.Request, p
 	}
 
 	if err = a.Models.Movies.Update(movie); err != nil {
-		a.HandleError(w, r, err)
+		switch {
+		case errors.Is(err, data.ErrEditConflict):
+			a.HandleConflict(w, r, "error while updating movie due to a conflict, please try again", err)
+		default:
+			a.HandleError(w, r, err)
+		}
 		return
 	}
 
