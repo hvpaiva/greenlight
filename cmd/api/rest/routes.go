@@ -11,6 +11,8 @@ func (a Application) Routes() http.Handler {
 	router := httprouter.New()
 
 	router.GET("/v1/healthcheck", a.healthcheckHandler)
+
+	router.GET("/v1/movies", a.showMoviesHandler)
 	router.GET("/v1/movies/:id", a.getMovieHandler)
 	router.POST("/v1/movies", a.createMovieHandler)
 	router.PUT("/v1/movies/:id", a.updateMovieHandler)
@@ -20,5 +22,5 @@ func (a Application) Routes() http.Handler {
 	router.NotFound = http.HandlerFunc(a.NotFoundFunc)
 	router.MethodNotAllowed = http.HandlerFunc(a.MethodNotAllowedFunc)
 
-	return a.recoverPanic(router)
+	return a.recoverPanic(a.RateLimit(router))
 }

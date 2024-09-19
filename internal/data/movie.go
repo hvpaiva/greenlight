@@ -4,10 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/lib/pq"
 
+	"github.com/hvpaiva/greenlight/pkg/filters"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
@@ -158,4 +160,62 @@ func (m MovieModel) Delete(id int64) error {
 	}
 
 	return nil
+}
+
+func (m MovieModel) GetAll(title string, genres []string, filter filters.Filter) ([]*Movie, filters.Metadata, error) {
+	query := fmt.Sprintf(`
+        SELECT count(*) OVER(), id, title, year, runtime, genres, created_at, version
+        FROM movies
+        WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '') 
+        AND (genres @> $2 OR $2 = '{}')     
+        ORDER BY %s %s, id
+        LIMIT $3 OFFSET $4`, filter.SortColumn(), filter.SortDirection())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	args := []any{title, pq.Array(genres), filter.Limit(), filter.Offset()}
+
+	rows, err := m.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, filters.ZeroValueMetadata(), err
+	}
+
+	defer func(rows *sql.Rows) {
+		err = rows.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(rows)
+
+	totalRecords := 0
+	movies := make([]*Movie, 0)
+
+	for rows.Next() {
+		var movie Movie
+		err := rows.Scan(
+			&totalRecords,
+			&movie.ID,
+			&movie.Title,
+			&movie.Year,
+			&movie.Runtime,
+			pq.Array(&movie.Genres),
+			&movie.CreatedAt,
+			&movie.Version,
+		)
+
+		if err != nil {
+			return nil, filters.ZeroValueMetadata(), err
+		}
+
+		movies = append(movies, &movie)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, filters.ZeroValueMetadata(), err
+	}
+
+	metadata := filters.CalculateMetadata(totalRecords, filter.Page, filter.PageSize)
+
+	return movies, metadata, nil
 }

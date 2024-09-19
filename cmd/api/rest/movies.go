@@ -9,6 +9,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/hvpaiva/greenlight/internal/data"
+	"github.com/hvpaiva/greenlight/pkg/filters"
+	"github.com/hvpaiva/greenlight/pkg/query"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
@@ -243,6 +245,48 @@ func (a Application) deleteMovieHandler(w http.ResponseWriter, r *http.Request, 
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a Application) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	var input struct {
+		Title  string
+		Genres []string
+		filters.Filter
+	}
+
+	v := validator.New()
+
+	qs := r.URL.Query()
+
+	input.Title = query.ReadString(qs, "title", "")
+	input.Genres = query.ReadCSV(qs, "genres", []string{})
+
+	input.Page = query.ReadInt(qs, "page", 1, v)
+	input.PageSize = query.ReadInt(qs, "page_size", 20, v)
+	input.Sort = query.ReadString(qs, "sort", "id")
+	input.SortSafeList = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
+
+	if input.Filter.Validate(v); !v.Valid() {
+		a.HandleValidationErrors(w, r, v.Errors)
+		return
+	}
+
+	movies, metadata, err := a.Models.Movies.GetAll(input.Title, input.Genres, input.Filter)
+	if err != nil {
+		a.HandleError(w, r, err)
+		return
+	}
+
+	var output struct {
+		Metadata filters.Metadata `json:"metadata"`
+		Movies   []*data.Movie    `json:"movies"`
+	}
+	output.Movies = movies
+	output.Metadata = metadata
+
+	if err = ujson.Write(w, http.StatusOK, output, nil); err != nil {
+		a.HandleError(w, r, err)
+	}
 }
 
 func parseId(param httprouter.Params) (int64, error) {
