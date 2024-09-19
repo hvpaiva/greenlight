@@ -11,7 +11,7 @@ import (
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (a Application) registerUserHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Application) registerUserHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	var input struct {
 		Name     string `json:"name"`
 		Email    string `json:"email"`

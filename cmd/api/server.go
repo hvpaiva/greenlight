@@ -36,7 +36,13 @@ func serve(app *rest.Application) error {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		shutdownError <- srv.Shutdown(ctx)
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			shutdownError <- err
+		}
+
+		app.Wg.Wait()
+		shutdownError <- nil
 	}()
 
 	app.Logger.Info("starting server",

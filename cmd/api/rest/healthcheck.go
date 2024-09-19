@@ -8,7 +8,7 @@ import (
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 )
 
-func (a Application) healthcheckHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (a *Application) healthcheckHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	a.Logger.Debug("healthcheck endpoint hit")
 
 	data := map[string]any{

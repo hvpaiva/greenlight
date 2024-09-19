@@ -9,7 +9,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func (a Application) RateLimit(next http.Handler) http.Handler {
+func (a *Application) RateLimit(next http.Handler) http.Handler {
 	type client struct {
 		limiter  *rate.Limiter
 		lastSeen time.Time

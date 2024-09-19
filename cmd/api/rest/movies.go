@@ -15,7 +15,7 @@ import (
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (a Application) getMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Application) getMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	id, err := parseId(params)
 	if err != nil {
 		a.HandleNotFound(w, r, "movie not found", err)
@@ -38,7 +38,7 @@ func (a Application) getMovieHandler(w http.ResponseWriter, r *http.Request, par
 	}
 }
 
-func (a Application) createMovieHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (a *Application) createMovieHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var input struct {
 		Title   string       `json:"title"`
 		Year    int32        `json:"year"`
@@ -79,7 +79,7 @@ func (a Application) createMovieHandler(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-func (a Application) updateMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Application) updateMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	id, err := parseId(params)
 	if err != nil {
 		a.HandleNotFound(w, r, "movie not found", err)
@@ -147,7 +147,7 @@ func (a Application) updateMovieHandler(w http.ResponseWriter, r *http.Request, 
 
 }
 
-func (a Application) patchMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Application) patchMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	id, err := parseId(params)
 	if err != nil {
 		a.HandleNotFound(w, r, "movie not found", err)
@@ -226,7 +226,7 @@ func (a Application) patchMovieHandler(w http.ResponseWriter, r *http.Request, p
 
 }
 
-func (a Application) deleteMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (a *Application) deleteMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	id, err := parseId(params)
 	if err != nil {
 		a.HandleNotFound(w, r, "movie not found", err)
@@ -247,7 +247,7 @@ func (a Application) deleteMovieHandler(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (a Application) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (a *Application) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var input struct {
 		Title  string
 		Genres []string

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/hvpaiva/greenlight/internal/data"
@@ -16,6 +17,7 @@ type Application struct {
 	Config Config
 	Logger *slog.Logger
 	Models data.Models
+	Wg     sync.WaitGroup
 }
 
 type Config struct {
