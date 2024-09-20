@@ -20,6 +20,7 @@ func (a *Application) Routes() http.Handler {
 	router.PATCH("/v1/movies/:id", a.patchMovieHandler)
 
 	router.POST("/v1/users", a.registerUserHandler)
+	router.PATCH("/v1/users/activated", a.activateUserHandler)
 
 	router.NotFound = http.HandlerFunc(a.NotFoundFunc)
 	router.MethodNotAllowed = http.HandlerFunc(a.MethodNotAllowedFunc)
