@@ -59,6 +59,11 @@ func (a *Application) registerUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	if err = a.Models.Permission.AddForUser(user.ID, data.PermissionMovieRead); err != nil {
+		a.HandleError(w, r, err)
+		return
+	}
+
 	token, err := a.Models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
 	if err != nil {
 		a.HandleError(w, r, err)
