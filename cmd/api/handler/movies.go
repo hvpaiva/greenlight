@@ -16,8 +16,8 @@ import (
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (h *Handler) getMovieHandler(w http.ResponseWriter, _ *http.Request, params httprouter.Params) error {
-	id, err := parseId(params)
+func (h *Handler) getMovieHandler(w http.ResponseWriter, r *http.Request) error {
+	id, err := parseId(r)
 	if err != nil {
 		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
@@ -39,7 +39,7 @@ func (h *Handler) getMovieHandler(w http.ResponseWriter, _ *http.Request, params
 	return nil
 }
 
-func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
+func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request) error {
 	var input struct {
 		Title   string       `json:"title"`
 		Year    int32        `json:"year"`
@@ -79,8 +79,8 @@ func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request, _ h
 	return nil
 }
 
-func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
-	id, err := parseId(params)
+func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request) error {
+	id, err := parseId(r)
 	if err != nil {
 		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
@@ -139,8 +139,8 @@ func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request, par
 	return nil
 }
 
-func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
-	id, err := parseId(params)
+func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request) error {
+	id, err := parseId(r)
 	if err != nil {
 		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
@@ -210,8 +210,8 @@ func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request, para
 	return nil
 }
 
-func (h *Handler) deleteMovieHandler(w http.ResponseWriter, _ *http.Request, params httprouter.Params) error {
-	id, err := parseId(params)
+func (h *Handler) deleteMovieHandler(w http.ResponseWriter, r *http.Request) error {
+	id, err := parseId(r)
 	if err != nil {
 		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
@@ -231,7 +231,7 @@ func (h *Handler) deleteMovieHandler(w http.ResponseWriter, _ *http.Request, par
 	return nil
 }
 
-func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
+func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request) error {
 	var input struct {
 		Title  string
 		Genres []string
@@ -273,7 +273,9 @@ func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ ht
 	return nil
 }
 
-func parseId(param httprouter.Params) (int64, error) {
+func parseId(r *http.Request) (int64, error) {
+	param := httprouter.ParamsFromContext(r.Context())
+
 	id, err := strconv.ParseInt(param.ByName("id"), 10, 64)
 	if err != nil {
 		return 0, errors.New(fmt.Sprintf("error while parsing id from params: %s", err.Error()))

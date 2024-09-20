@@ -5,15 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
+func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request) error {
 	var input struct {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
@@ -76,7 +74,7 @@ func (h *Handler) registerUserHandler(w http.ResponseWriter, r *http.Request, _ 
 	return nil
 }
 
-func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
+func (h *Handler) activateUserHandler(w http.ResponseWriter, r *http.Request) error {
 	var input struct {
 		TokenPlaintext string `json:"token"`
 	}

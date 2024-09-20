@@ -5,15 +5,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (h *Handler) CreteAuthTokenHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
+func (h *Handler) creteAuthTokenHandler(w http.ResponseWriter, r *http.Request) error {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`

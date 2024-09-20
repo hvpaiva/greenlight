@@ -4,17 +4,13 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/hvpaiva/greenlight/cmd/api/app"
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/cmd/api/middleware"
 	"github.com/hvpaiva/greenlight/internal/data"
 )
 
-type Func func(http.ResponseWriter, *http.Request, httprouter.Params) error
-
-type MFunc func(http.Handler) (http.Handler, error)
+type handlerFunc func(http.ResponseWriter, *http.Request) error
 
 type Handler struct {
 	App        *app.Application
@@ -31,10 +27,10 @@ func New(app *app.Application, db *sql.DB, limiter *middleware.Limiter) *Handler
 	}
 }
 
-func (h *Handler) adapt(handler Func) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		if e := handler(w, r, p); e != nil {
+func (h *Handler) adapt(handler handlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if e := handler(w, r); e != nil {
 			erro.Handle(h.App, w, r, e)
 		}
-	}
+	})
 }

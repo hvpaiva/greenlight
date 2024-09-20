@@ -3,13 +3,11 @@ package handler
 import (
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 )
 
-func (h *Handler) healthcheckHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
+func (h *Handler) healthcheckHandler(w http.ResponseWriter, _ *http.Request) error {
 	h.App.Logger.Debug("healthcheck endpoint hit")
 
 	data := map[string]any{

@@ -6,40 +6,50 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
+	"github.com/hvpaiva/greenlight/cmd/api/middleware"
 	"github.com/hvpaiva/greenlight/internal/data"
 )
 
 func (h *Handler) Router() http.Handler {
 	r := httprouter.New()
 
-	r.GET("/v1/healthcheck", h.adapt(h.healthcheckHandler))
+	h.register(r, http.MethodGet, "/v1/healthcheck", h.healthcheckHandler)
 
-	r.GET("/v1/movies", h.Middleware.Authorize(data.PermissionMovieRead)(h.adapt(h.showMoviesHandler)))
-	r.GET("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieRead)(h.adapt(h.getMovieHandler)))
-	r.POST("/v1/movies", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.createMovieHandler)))
-	r.PUT("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.updateMovieHandler)))
-	r.DELETE("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.deleteMovieHandler)))
-	r.PATCH("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.patchMovieHandler)))
+	h.register(r, http.MethodGet, "/v1/movies", h.showMoviesHandler, h.Middleware.Authorize(data.PermissionMovieRead))
+	h.register(r, http.MethodGet, "/v1/movies/:id", h.getMovieHandler, h.Middleware.Authorize(data.PermissionMovieRead))
+	h.register(r, http.MethodPost, "/v1/movies", h.createMovieHandler, h.Middleware.Authorize(data.PermissionMovieWrite))
+	h.register(r, http.MethodPut, "/v1/movies/:id", h.updateMovieHandler, h.Middleware.Authorize(data.PermissionMovieWrite))
+	h.register(r, http.MethodDelete, "/v1/movies/:id", h.deleteMovieHandler, h.Middleware.Authorize(data.PermissionMovieWrite))
+	h.register(r, http.MethodPatch, "/v1/movies/:id", h.patchMovieHandler, h.Middleware.Authorize(data.PermissionMovieWrite))
 
-	r.POST("/v1/users", h.adapt(h.registerUserHandler))
-	r.PATCH("/v1/users/activated", h.adapt(h.activateUserHandler))
+	h.register(r, http.MethodPost, "/v1/users", h.registerUserHandler)
+	h.register(r, http.MethodPatch, "/v1/users/activated", h.activateUserHandler)
 
-	r.POST("/v1/tokens/authentication", h.adapt(h.CreteAuthTokenHandler))
+	h.register(r, http.MethodPost, "/v1/tokens/authentication", h.creteAuthTokenHandler)
 
 	r.NotFound = notFoundFunc(h)
 	r.MethodNotAllowed = methodNotAllowedFunc(h)
 
-	return h.Middleware.RecoverPanic(h.Middleware.RateLimit(h.Middleware.Authenticate(r)))
+	return addMiddlewares(r, h.Middleware.RecoverPanic, h.Middleware.RateLimit, h.Middleware.Authenticate)
 }
 
-func (h *Handler) register(r *httprouter.Router, method string, path string, handle Func, middlewares ...func(next httprouter.Handle) httprouter.Handle) {
-	aggregated := h.adapt(handle)
+func (h *Handler) register(r *httprouter.Router, method string, path string, handle handlerFunc, middlewares ...middleware.Func) {
+	var aggregated = h.adapt(handle)
 
 	for _, m := range middlewares {
 		aggregated = m(aggregated)
 	}
 
-	r.Handle(method, path, aggregated)
+	r.Handler(method, path, aggregated)
+}
+
+func addMiddlewares(r *httprouter.Router, middlewares ...middleware.Func) http.Handler {
+	var aggregated http.Handler = r
+	for _, m := range middlewares {
+		aggregated = m(aggregated)
+	}
+
+	return aggregated
 }
 
 var methodNotAllowedFunc = func(h *Handler) http.Handler {

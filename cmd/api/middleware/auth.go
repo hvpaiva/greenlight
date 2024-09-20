@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/validator"
@@ -57,9 +55,9 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) Authorize(permission string) func(handler httprouter.Handle) httprouter.Handle {
-	return func(handler httprouter.Handle) httprouter.Handle {
-		fn := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+func (m *Middleware) Authorize(permission string) func(handler http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := m.App.ContextGetUser(r)
 
 			if user.IsAnonymous() {
@@ -72,16 +70,16 @@ func (m *Middleware) Authorize(permission string) func(handler httprouter.Handle
 				return
 			}
 
-			handler(w, r, param)
-		}
+			handler.ServeHTTP(w, r)
+		})
 
 		return m.CheckPermissions(permission)(fn)
 	}
 }
 
-func (m *Middleware) CheckPermissions(permission string) func(next httprouter.Handle) httprouter.Handle {
-	return func(next httprouter.Handle) httprouter.Handle {
-		return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+func (m *Middleware) CheckPermissions(permission string) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := m.App.ContextGetUser(r)
 
 			permissions, err := m.Models.Permission.GetAllForUser(user.ID)
@@ -95,7 +93,7 @@ func (m *Middleware) CheckPermissions(permission string) func(next httprouter.Ha
 				return
 			}
 
-			next(w, r, param)
-		}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
