@@ -55,8 +55,8 @@ func (a *Application) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-func (a *Application) Authorize(next httprouter.Handle) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+func (a *Application) Authorize(permission string, next httprouter.Handle) httprouter.Handle {
+	fn := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
 		user := a.contextGetUser(r)
 
 		if user.IsAnonymous() {
@@ -66,6 +66,27 @@ func (a *Application) Authorize(next httprouter.Handle) httprouter.Handle {
 
 		if !user.Activated {
 			a.HandleForbidden(w, r, "user not activated")
+			return
+		}
+
+		next(w, r, param)
+	}
+
+	return a.CheckPermissions(permission, fn)
+}
+
+func (a *Application) CheckPermissions(permission string, next httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+		user := a.contextGetUser(r)
+
+		permissions, err := a.Models.Permission.GetAllForUser(user.ID)
+		if err != nil {
+			a.HandleError(w, r, err)
+			return
+		}
+
+		if !permissions.Contains(permission) {
+			a.HandleForbidden(w, r, "user does not have the required permission")
 			return
 		}
 
