@@ -22,8 +22,10 @@ func (a *Application) Routes() http.Handler {
 	router.POST("/v1/users", a.registerUserHandler)
 	router.PATCH("/v1/users/activated", a.activateUserHandler)
 
+	router.POST("/v1/tokens/authentication", a.creteAuthTokenHandler)
+
 	router.NotFound = http.HandlerFunc(a.NotFoundFunc)
 	router.MethodNotAllowed = http.HandlerFunc(a.MethodNotAllowedFunc)
 
-	return a.recoverPanic(a.RateLimit(router))
+	return a.recoverPanic(a.RateLimit(a.Authenticate(router)))
 }

@@ -58,7 +58,7 @@ func (a *Application) RateLimit(next http.Handler) http.Handler {
 
 		if !clients[ip].limiter.Allow() {
 			mu.Unlock()
-			a.HandleError(w, r, NewHTTPError("rate limit exceeded", http.StatusTooManyRequests))
+			a.HandleError(w, r, NewHttpError("rate limit exceeded", http.StatusTooManyRequests))
 			return
 		}
 

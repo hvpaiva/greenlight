@@ -19,7 +19,7 @@ func (e HTTPError) Error() string {
 	return e.Message
 }
 
-func NewHTTPError(message string, status int) HTTPError {
+func NewHttpError(message string, status int) HTTPError {
 	return HTTPError{
 		Message: message,
 		Status:  status,
@@ -39,7 +39,7 @@ func HandleError(w http.ResponseWriter, r *http.Request, a *Application, err err
 		httpErr.Log(a, r)
 		httpErr.Write(w)
 	} else {
-		e := NewHTTPError(err.Error(), http.StatusInternalServerError)
+		e := NewHttpError(err.Error(), http.StatusInternalServerError)
 		e.Log(a, r)
 		ErrInternalServerError.Write(w)
 	}
@@ -87,11 +87,11 @@ func Write(w http.ResponseWriter, status int, data any) {
 }
 
 var (
-	ErrInternalServerError = NewHTTPError("internal server error", http.StatusInternalServerError)
+	ErrInternalServerError = NewHttpError("internal server error", http.StatusInternalServerError)
 )
 
 func NotFound(message string) HTTPError {
-	return NewHTTPError(message, http.StatusNotFound)
+	return NewHttpError(message, http.StatusNotFound)
 }
 
 func (a *Application) NotFoundFunc(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +100,7 @@ func (a *Application) NotFoundFunc(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Application) MethodNotAllowedFunc(w http.ResponseWriter, r *http.Request) {
-	err := NewHTTPError(fmt.Sprintf(
+	err := NewHttpError(fmt.Sprintf(
 		"the requested method %s is not allowed for the resource %s", r.Method, r.URL.String()),
 		http.StatusMethodNotAllowed,
 	)
@@ -121,4 +121,9 @@ func (a *Application) HandleValidationErrors(w http.ResponseWriter, r *http.Requ
 
 func (a *Application) HandleConflict(w http.ResponseWriter, r *http.Request, message string, err error) {
 	a.HandleError(w, r, NewHttpErrorWithCause(message, http.StatusConflict, err))
+}
+
+func (a *Application) HandleUnauthorized(w http.ResponseWriter, r *http.Request, message string) {
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	a.HandleError(w, r, NewHttpError(message, http.StatusUnauthorized))
 }

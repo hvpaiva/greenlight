@@ -16,6 +16,8 @@ var (
 	ErrDuplicateEmail = errors.New("duplicate email")
 )
 
+var AnonymousUser = &User{}
+
 type Email string
 
 type User struct {
@@ -31,6 +33,10 @@ type User struct {
 type password struct {
 	plaintext *string
 	hash      []byte
+}
+
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
 }
 
 func (p *password) Set(plaintextPassword string) error {
@@ -65,16 +71,16 @@ func (p *password) Validate(v *validator.Validator) {
 	v.Check(len(*p.plaintext) <= 72, "password", "must not be more than 72 bytes long")
 }
 
-func (e *Email) Validate(v *validator.Validator) {
-	v.Check(string(*e) != "", "email", "must be provided")
-	v.Check(validator.Matches(string(*e), validator.EmailRX), "email", "must be a valid email address")
+func ValidateEmail(v *validator.Validator, email string) {
+	v.Check(email != "", "email", "must be provided")
+	v.Check(validator.Matches(email, validator.EmailRX), "email", "must be a valid email address")
 }
 
-func (u User) Validate(v *validator.Validator) {
+func (u *User) Validate(v *validator.Validator) {
 	v.Check(u.Name != "", "name", "must be provided")
 	v.Check(len(u.Name) <= 500, "name", "must not be more than 500 bytes long")
 
-	u.Email.Validate(v)
+	ValidateEmail(v, string(u.Email))
 
 	if u.Password.plaintext != nil {
 		u.Password.Validate(v)
