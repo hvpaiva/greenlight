@@ -30,7 +30,12 @@ func (h *Handler) Router() http.Handler {
 	r.NotFound = notFoundFunc(h)
 	r.MethodNotAllowed = methodNotAllowedFunc(h)
 
-	return addMiddlewares(r, h.Middleware.RecoverPanic, h.Middleware.RateLimit, h.Middleware.Authenticate)
+	return addMiddlewares(r,
+		h.Middleware.EnableCors,
+		h.Middleware.RecoverPanic,
+		h.Middleware.RateLimit,
+		h.Middleware.Authenticate,
+	)
 }
 
 func (h *Handler) register(r *httprouter.Router, method string, path string, handle handlerFunc, middlewares ...middleware.Func) {

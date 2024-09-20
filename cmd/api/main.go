@@ -33,7 +33,7 @@ func main() {
 		}
 	}(db)
 
-	a := app.New(logger, cfg.env, cfg.version)
+	a := app.New(logger, cfg.env, cfg.version, cfg.cors.trustedOrigins)
 	h := handler.New(a, db, &cfg.limiter)
 
 	if err := serve(cfg, a, h); err != nil {

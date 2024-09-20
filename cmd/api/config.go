@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hvpaiva/greenlight/cmd/api/middleware"
@@ -15,6 +16,11 @@ type config struct {
 	debug   bool
 	db      dbConfig
 	limiter middleware.Limiter
+	cors    corsConfig
+}
+
+type corsConfig struct {
+	trustedOrigins []string
 }
 
 type dbConfig struct {
@@ -39,6 +45,11 @@ func initConfig(version string) config {
 	flag.Float64Var(&cfg.limiter.Rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.Burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.Enabled, "limiter-enabled", true, "Enable rate limiter")
+
+	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
+		cfg.cors.trustedOrigins = strings.Fields(val)
+		return nil
+	})
 
 	flag.Parse()
 

@@ -7,17 +7,19 @@ import (
 )
 
 type Application struct {
-	Logger  *slog.Logger
-	Wg      sync.WaitGroup
-	Env     string
-	Version string
+	Logger      *slog.Logger
+	Wg          sync.WaitGroup
+	Env         string
+	Version     string
+	TrustedCors []string
 }
 
-func New(logger *slog.Logger, env, version string) *Application {
+func New(logger *slog.Logger, env, version string, trustedCors []string) *Application {
 	return &Application{
-		Logger:  logger,
-		Env:     env,
-		Version: version,
+		Logger:      logger,
+		Env:         env,
+		Version:     version,
+		TrustedCors: trustedCors,
 	}
 }
 
