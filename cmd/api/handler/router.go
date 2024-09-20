@@ -5,28 +5,51 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 )
 
 func (h *Handler) Router() http.Handler {
-	router := httprouter.New()
+	r := httprouter.New()
 
-	router.GET("/v1/healthcheck", h.healthcheckHandler)
+	r.GET("/v1/healthcheck", h.adapt(h.healthcheckHandler))
 
-	router.GET("/v1/movies", h.Middleware.Authorize(data.PermissionMovieRead, h.showMoviesHandler))
-	router.GET("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieRead, h.getMovieHandler))
-	router.POST("/v1/movies", h.Middleware.Authorize(data.PermissionMovieWrite, h.createMovieHandler))
-	router.PUT("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite, h.updateMovieHandler))
-	router.DELETE("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite, h.deleteMovieHandler))
-	router.PATCH("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite, h.patchMovieHandler))
+	r.GET("/v1/movies", h.Middleware.Authorize(data.PermissionMovieRead)(h.adapt(h.showMoviesHandler)))
+	r.GET("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieRead)(h.adapt(h.getMovieHandler)))
+	r.POST("/v1/movies", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.createMovieHandler)))
+	r.PUT("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.updateMovieHandler)))
+	r.DELETE("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.deleteMovieHandler)))
+	r.PATCH("/v1/movies/:id", h.Middleware.Authorize(data.PermissionMovieWrite)(h.adapt(h.patchMovieHandler)))
 
-	router.POST("/v1/users", h.registerUserHandler)
-	router.PATCH("/v1/users/activated", h.activateUserHandler)
+	r.POST("/v1/users", h.adapt(h.registerUserHandler))
+	r.PATCH("/v1/users/activated", h.adapt(h.activateUserHandler))
 
-	router.POST("/v1/tokens/authentication", h.CreteAuthTokenHandler)
+	r.POST("/v1/tokens/authentication", h.adapt(h.CreteAuthTokenHandler))
 
-	router.NotFound = http.HandlerFunc(h.App.NotFoundFunc)
-	router.MethodNotAllowed = http.HandlerFunc(h.App.MethodNotAllowedFunc)
+	r.NotFound = notFoundFunc(h)
+	r.MethodNotAllowed = methodNotAllowedFunc(h)
 
-	return h.Middleware.RecoverPanic(h.Middleware.RateLimit(h.Middleware.Authenticate(router)))
+	return h.Middleware.RecoverPanic(h.Middleware.RateLimit(h.Middleware.Authenticate(r)))
+}
+
+func (h *Handler) register(r *httprouter.Router, method string, path string, handle Func, middlewares ...func(next httprouter.Handle) httprouter.Handle) {
+	aggregated := h.adapt(handle)
+
+	for _, m := range middlewares {
+		aggregated = m(aggregated)
+	}
+
+	r.Handle(method, path, aggregated)
+}
+
+var methodNotAllowedFunc = func(h *Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		erro.Handle(h.App, w, r, erro.MethodNotAllowed)
+	})
+}
+
+var notFoundFunc = func(h *Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		erro.Handle(h.App, w, r, erro.NotFound)
+	})
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
@@ -14,6 +15,7 @@ import (
 func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
+		w.Header().Set("WWW-Authenticate", "Bearer")
 
 		authHeader := r.Header.Get("Authorization")
 
@@ -25,7 +27,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 
 		headerParts := strings.Split(authHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			m.App.HandleUnauthorized(w, r, "invalid or malformed authorization header")
+			erro.Handle(m.App, w, r, erro.Unauthorized.WithMessage("invalid or malformed authorization header"))
 			return
 		}
 
@@ -34,7 +36,7 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		v := validator.New()
 
 		if data.ValidateToken(v, token); !v.Valid() {
-			m.App.HandleUnauthorized(w, r, "invalid or malformed authorization token")
+			erro.Handle(m.App, w, r, erro.Unauthorized.WithMessage("invalid or malformed authorization token"))
 			return
 		}
 
@@ -42,9 +44,9 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
-				m.App.HandleUnauthorized(w, r, "invalid or expired authorization token")
+				erro.Handle(m.App, w, r, erro.Unauthorized.WithMessage("invalid or expired authorization token"))
 			default:
-				m.App.HandleError(w, r, err)
+				erro.Handle(m.App, w, r, erro.ThrowInternalServer("get user token", err))
 			}
 			return
 		}
@@ -55,41 +57,45 @@ func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	})
 }
 
-func (m *Middleware) Authorize(permission string, next httprouter.Handle) httprouter.Handle {
-	fn := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		user := m.App.ContextGetUser(r)
+func (m *Middleware) Authorize(permission string) func(handler httprouter.Handle) httprouter.Handle {
+	return func(handler httprouter.Handle) httprouter.Handle {
+		fn := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+			user := m.App.ContextGetUser(r)
 
-		if user.IsAnonymous() {
-			m.App.HandleUnauthorized(w, r, "authentication required")
-			return
+			if user.IsAnonymous() {
+				erro.Handle(m.App, w, r, erro.Unauthorized.WithMessage("authentication required"))
+				return
+			}
+
+			if !user.Activated {
+				erro.Handle(m.App, w, r, erro.Forbidden.WithMessage("user not activated"))
+				return
+			}
+
+			handler(w, r, param)
 		}
 
-		if !user.Activated {
-			m.App.HandleForbidden(w, r, "user not activated")
-			return
-		}
-
-		next(w, r, param)
+		return m.CheckPermissions(permission)(fn)
 	}
-
-	return m.CheckPermissions(permission, fn)
 }
 
-func (m *Middleware) CheckPermissions(permission string, next httprouter.Handle) httprouter.Handle {
-	return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		user := m.App.ContextGetUser(r)
+func (m *Middleware) CheckPermissions(permission string) func(next httprouter.Handle) httprouter.Handle {
+	return func(next httprouter.Handle) httprouter.Handle {
+		return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+			user := m.App.ContextGetUser(r)
 
-		permissions, err := m.Models.Permission.GetAllForUser(user.ID)
-		if err != nil {
-			m.App.HandleError(w, r, err)
-			return
+			permissions, err := m.Models.Permission.GetAllForUser(user.ID)
+			if err != nil {
+				erro.Handle(m.App, w, r, erro.ThrowInternalServer("get user permissions", err))
+				return
+			}
+
+			if !permissions.Contains(permission) {
+				erro.Handle(m.App, w, r, erro.Forbidden.WithMessage("user does not have the required permission"))
+				return
+			}
+
+			next(w, r, param)
 		}
-
-		if !permissions.Contains(permission) {
-			m.App.HandleForbidden(w, r, "user does not have the required permission")
-			return
-		}
-
-		next(w, r, param)
 	}
 }

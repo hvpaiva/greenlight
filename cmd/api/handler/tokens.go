@@ -7,21 +7,20 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
-	"github.com/hvpaiva/greenlight/cmd/api/app"
+	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (h *Handler) CreteAuthTokenHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) CreteAuthTokenHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
 	if err := ujson.Read(w, r, &input); err != nil {
-		h.App.HandleBadRequest(w, r, "error while decoding input", err)
-		return
+		return erro.BadRequest.WithMessage(err.Error())
 	}
 
 	v := validator.New()
@@ -30,36 +29,31 @@ func (h *Handler) CreteAuthTokenHandler(w http.ResponseWriter, r *http.Request, 
 	data.ValidatePassword(v, input.Password)
 
 	if !v.Valid() {
-		h.App.HandleValidationErrors(w, r, v.Errors)
-		return
+		return erro.NewValidationErr("auth validation", v.Errors)
 	}
 
 	user, err := h.Models.Users.GetByEmail(input.Email)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			h.App.HandleError(w, r, app.NewErrorWithCause("invalid credentials", http.StatusUnauthorized, err))
+			return erro.Throw(erro.Unauthorized, erro.Cause("get user by email", err))
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("get user by email", err)
 		}
-		return
 	}
 
 	match, err := user.Password.Matches(input.Password)
 	if err != nil {
-		h.App.HandleError(w, r, err)
-		return
+		return erro.ThrowInternalServer("matching password", err)
 	}
 
 	if !match {
-		h.App.HandleError(w, r, app.NewError("invalid credentials", http.StatusUnauthorized))
-		return
+		return erro.Throw(erro.Unauthorized, erro.Cause("invalid credential", err))
 	}
 
 	token, err := h.Models.Tokens.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {
-		h.App.HandleError(w, r, err)
-		return
+		return erro.ThrowInternalServer("create token", err)
 	}
 
 	var output struct {
@@ -69,7 +63,8 @@ func (h *Handler) CreteAuthTokenHandler(w http.ResponseWriter, r *http.Request, 
 	output.AccessToken = token
 
 	if err = ujson.Write(w, http.StatusCreated, output, nil); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("output response", err)
 	}
 
+	return nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/filters"
 	"github.com/hvpaiva/greenlight/pkg/query"
@@ -15,30 +16,30 @@ import (
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (h *Handler) getMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (h *Handler) getMovieHandler(w http.ResponseWriter, _ *http.Request, params httprouter.Params) error {
 	id, err := parseId(params)
 	if err != nil {
-		h.App.HandleNotFound(w, r, "movie not found", err)
-		return
+		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
 
 	movie, err := h.Models.Movies.Get(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			h.App.HandleNotFound(w, r, "error while getting movie", err)
+			return erro.NotFound.WithMessage("the movie you are looking for does not exist")
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("get movie", err)
 		}
-		return
 	}
 
 	if err = ujson.Write(w, http.StatusOK, movie, nil); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("output response", err)
 	}
+
+	return nil
 }
 
-func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
 	var input struct {
 		Title   string       `json:"title"`
 		Year    int32        `json:"year"`
@@ -47,8 +48,7 @@ func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request, _ h
 	}
 
 	if err := ujson.Read(w, r, &input); err != nil {
-		h.App.HandleBadRequest(w, r, "error while decoding input", err)
-		return
+		return erro.BadRequest.WithMessage(err.Error())
 	}
 
 	movie := &data.Movie{
@@ -61,49 +61,43 @@ func (h *Handler) createMovieHandler(w http.ResponseWriter, r *http.Request, _ h
 	v := validator.New()
 
 	if movie.Validate(v); !v.Valid() {
-		h.App.HandleValidationErrors(w, r, v.Errors)
-		return
+		return erro.NewValidationErr("movie validation", v.Errors)
 	}
 
 	err := h.Models.Movies.Insert(movie)
 	if err != nil {
-		h.App.HandleError(w, r, err)
-		return
+		return erro.ThrowInternalServer("insert movie", err)
 	}
 
 	headers := make(http.Header)
 	headers.Set("Location", fmt.Sprintf("/v1/movies/%d", movie.ID))
 
 	if err = ujson.Write(w, http.StatusCreated, movie, headers); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("output response", err)
 	}
+
+	return nil
 }
 
-func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
 	id, err := parseId(params)
 	if err != nil {
-		h.App.HandleNotFound(w, r, "movie not found", err)
-		return
+		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
 
 	movie, err := h.Models.Movies.Get(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			h.App.HandleNotFound(w, r, "error while getting movie", err)
+			return erro.NotFound.WithMessage("the movie you are looking for does not exist")
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("get movie", err)
 		}
-		return
 	}
 
 	if r.Header.Get("X-Expected-Version") != "" {
 		if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
-			h.App.HandleConflict(w, r,
-				"the expected version does not match the current version of the movie",
-				errors.New("version mismatch"),
-			)
-			return
+			return erro.Conflict.WithMessage("the expected version does not match the current version of the movie")
 		}
 	}
 
@@ -115,8 +109,7 @@ func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request, par
 	}
 
 	if err = ujson.Read(w, r, &input); err != nil {
-		h.App.HandleBadRequest(w, r, "error while decoding input", err)
-		return
+		return erro.BadRequest.WithMessage(err.Error())
 	}
 
 	movie.Title = input.Title
@@ -127,51 +120,44 @@ func (h *Handler) updateMovieHandler(w http.ResponseWriter, r *http.Request, par
 	v := validator.New()
 
 	if movie.Validate(v); !v.Valid() {
-		h.App.HandleValidationErrors(w, r, v.Errors)
-		return
+		return erro.NewValidationErr("movie validation", v.Errors)
 	}
 
 	if err = h.Models.Movies.Update(movie); err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			h.App.HandleConflict(w, r, "error while updating movie due to a conflict, please try again", err)
+			return erro.Conflict.WithMessage("error while updating movie due to a conflict, please try again")
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("update movie", err)
 		}
-		return
 	}
 
 	if err = ujson.Write(w, http.StatusOK, movie, nil); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("output response", err)
 	}
 
+	return nil
 }
 
-func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) error {
 	id, err := parseId(params)
 	if err != nil {
-		h.App.HandleNotFound(w, r, "movie not found", err)
-		return
+		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
 
 	movie, err := h.Models.Movies.Get(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			h.App.HandleNotFound(w, r, "error while getting movie", err)
+			return erro.NotFound.WithMessage("the movie you are looking for does not exist")
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("get movie", err)
 		}
-		return
 	}
 
 	if r.Header.Get("X-Expected-Version") != "" {
 		if strconv.Itoa(int(movie.Version)) != r.Header.Get("X-Expected-Version") {
-			h.App.HandleConflict(w, r,
-				"the expected version does not match the current version of the movie",
-				errors.New("version mismatch"),
-			)
-			return
+			return erro.Conflict.WithMessage("the expected version does not match the current version of the movie")
 		}
 	}
 
@@ -183,8 +169,7 @@ func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request, para
 	}
 
 	if err = ujson.Read(w, r, &input); err != nil {
-		h.App.HandleBadRequest(w, r, "error while decoding input", err)
-		return
+		return erro.BadRequest.WithMessage(err.Error())
 	}
 
 	if input.Title != nil {
@@ -206,48 +191,47 @@ func (h *Handler) patchMovieHandler(w http.ResponseWriter, r *http.Request, para
 	v := validator.New()
 
 	if movie.Validate(v); !v.Valid() {
-		h.App.HandleValidationErrors(w, r, v.Errors)
-		return
+		return erro.NewValidationErr("movie validation", v.Errors)
 	}
 
 	if err = h.Models.Movies.Update(movie); err != nil {
 		switch {
 		case errors.Is(err, data.ErrEditConflict):
-			h.App.HandleConflict(w, r, "error while updating movie due to a conflict, please try again", err)
+			return erro.Conflict.WithMessage("error while updating movie due to a conflict, please try again")
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("update movie", err)
 		}
-		return
 	}
 
 	if err = ujson.Write(w, http.StatusOK, movie, nil); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("output response", err)
 	}
 
+	return nil
 }
 
-func (h *Handler) deleteMovieHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (h *Handler) deleteMovieHandler(w http.ResponseWriter, _ *http.Request, params httprouter.Params) error {
 	id, err := parseId(params)
 	if err != nil {
-		h.App.HandleNotFound(w, r, "movie not found", err)
-		return
+		return erro.Throw(erro.BadRequest.WithMessage("invalid id"), erro.Cause("parsing id", err))
 	}
 
 	err = h.Models.Movies.Delete(id)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			h.App.HandleNotFound(w, r, "error while deleting movie", err)
+			return erro.NotFound.WithMessage("the movie you are looking for does not exist")
 		default:
-			h.App.HandleError(w, r, err)
+			return erro.ThrowInternalServer("get movie", err)
 		}
-		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+
+	return nil
 }
 
-func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
 	var input struct {
 		Title  string
 		Genres []string
@@ -267,14 +251,12 @@ func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ ht
 	input.SortSafeList = []string{"id", "title", "year", "runtime", "-id", "-title", "-year", "-runtime"}
 
 	if input.Filter.Validate(v); !v.Valid() {
-		h.App.HandleValidationErrors(w, r, v.Errors)
-		return
+		return erro.NewValidationErr("filter validation", v.Errors)
 	}
 
 	movies, metadata, err := h.Models.Movies.GetAll(input.Title, input.Genres, input.Filter)
 	if err != nil {
-		h.App.HandleError(w, r, err)
-		return
+		return erro.ThrowInternalServer("get all movies", err)
 	}
 
 	var output struct {
@@ -285,8 +267,10 @@ func (h *Handler) showMoviesHandler(w http.ResponseWriter, r *http.Request, _ ht
 	output.Metadata = metadata
 
 	if err = ujson.Write(w, http.StatusOK, output, nil); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("output response", err)
 	}
+
+	return nil
 }
 
 func parseId(param httprouter.Params) (int64, error) {

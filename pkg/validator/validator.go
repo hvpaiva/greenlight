@@ -26,7 +26,7 @@ func (v *Validator) Valid() bool {
 	return len(v.Errors) == 0
 }
 
-// AddError adds an error to the validator
+// AddError adds an erro to the validator
 func (v *Validator) AddError(key string, err string) {
 	if _, ok := v.Errors[key]; !ok {
 		v.Errors[key] = err

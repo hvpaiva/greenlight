@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"github.com/hvpaiva/greenlight/cmd/api/app"
+	"github.com/hvpaiva/greenlight/cmd/api/erro"
 )
 
 type Limiter struct {
@@ -52,7 +52,7 @@ func (m *Middleware) RateLimit(next http.Handler) http.Handler {
 
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			m.App.HandleError(w, r, err)
+			erro.Handle(m.App, w, r, erro.ThrowInternalServer("failed to get client IP address", err))
 			return
 		}
 
@@ -66,7 +66,7 @@ func (m *Middleware) RateLimit(next http.Handler) http.Handler {
 
 		if !clients[ip].limiter.Allow() {
 			mu.Unlock()
-			m.App.HandleError(w, r, app.NewError("rate limit exceeded", http.StatusTooManyRequests))
+			erro.Handle(m.App, w, r, erro.TooManyRequests.WithMessage("rate limit exceeded"))
 			return
 		}
 

@@ -5,10 +5,11 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 )
 
-func (h *Handler) healthcheckHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) healthcheckHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) error {
 	h.App.Logger.Debug("healthcheck endpoint hit")
 
 	data := map[string]any{
@@ -20,6 +21,8 @@ func (h *Handler) healthcheckHandler(w http.ResponseWriter, r *http.Request, _ h
 	}
 
 	if err := ujson.Write(w, http.StatusOK, data, nil); err != nil {
-		h.App.HandleError(w, r, err)
+		return erro.ThrowInternalServer("error writing response", err)
 	}
+
+	return nil
 }

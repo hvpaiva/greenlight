@@ -21,14 +21,14 @@ func main() {
 
 	db, err := openDB(cfg.db)
 	if err != nil {
-		logger.Error("database failed to open", slog.String("error", err.Error()))
+		logger.Error("database failed to open", slog.String("erro", err.Error()))
 		os.Exit(1)
 	}
 
 	defer func(db *sql.DB) {
 		err := db.Close()
 		if err != nil {
-			logger.Error("database failed to close", slog.String("error", err.Error()))
+			logger.Error("database failed to close", slog.String("erro", err.Error()))
 			os.Exit(1)
 		}
 	}(db)
@@ -37,7 +37,7 @@ func main() {
 	h := handler.New(a, db, &cfg.limiter)
 
 	if err := serve(cfg, a, h); err != nil {
-		logger.Error("server failed to start", slog.String("error", err.Error()))
+		logger.Error("server failed to start", slog.String("erro", err.Error()))
 		os.Exit(1)
 	}
 }
