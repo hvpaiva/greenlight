@@ -127,3 +127,7 @@ func (a *Application) HandleUnauthorized(w http.ResponseWriter, r *http.Request,
 	w.Header().Set("WWW-Authenticate", "Bearer")
 	a.HandleError(w, r, NewHttpError(message, http.StatusUnauthorized))
 }
+
+func (a *Application) HandleForbidden(w http.ResponseWriter, r *http.Request, message string) {
+	a.HandleError(w, r, NewHttpError(message, http.StatusForbidden))
+}

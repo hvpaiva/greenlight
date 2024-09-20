@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/julienschmidt/httprouter"
+
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
@@ -51,4 +53,22 @@ func (a *Application) Authenticate(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (a *Application) Authorize(next httprouter.Handle) httprouter.Handle {
+	return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
+		user := a.contextGetUser(r)
+
+		if user.IsAnonymous() {
+			a.HandleUnauthorized(w, r, "authentication required")
+			return
+		}
+
+		if !user.Activated {
+			a.HandleForbidden(w, r, "user not activated")
+			return
+		}
+
+		next(w, r, param)
+	}
 }

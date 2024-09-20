@@ -12,12 +12,12 @@ func (a *Application) Routes() http.Handler {
 
 	router.GET("/v1/healthcheck", a.healthcheckHandler)
 
-	router.GET("/v1/movies", a.showMoviesHandler)
-	router.GET("/v1/movies/:id", a.getMovieHandler)
-	router.POST("/v1/movies", a.createMovieHandler)
-	router.PUT("/v1/movies/:id", a.updateMovieHandler)
-	router.DELETE("/v1/movies/:id", a.deleteMovieHandler)
-	router.PATCH("/v1/movies/:id", a.patchMovieHandler)
+	router.GET("/v1/movies", a.Authorize(a.showMoviesHandler))
+	router.GET("/v1/movies/:id", a.Authorize(a.getMovieHandler))
+	router.POST("/v1/movies", a.Authorize(a.createMovieHandler))
+	router.PUT("/v1/movies/:id", a.Authorize(a.updateMovieHandler))
+	router.DELETE("/v1/movies/:id", a.Authorize(a.deleteMovieHandler))
+	router.PATCH("/v1/movies/:id", a.Authorize(a.patchMovieHandler))
 
 	router.POST("/v1/users", a.registerUserHandler)
 	router.PATCH("/v1/users/activated", a.activateUserHandler)
