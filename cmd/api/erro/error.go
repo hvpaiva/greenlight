@@ -70,7 +70,7 @@ func ThrowInternalServer(when string, err error) InternalErr {
 
 func NewValidationErr(when string, errs map[string]string) ValidationErr {
 	return ValidationErr{
-		Err:  New(fmt.Sprintf("%s error", when), http.StatusUnprocessableEntity),
+		Err:  UnprocessableEntity.WithMessage(fmt.Sprintf("%s error", when)),
 		errs: errs,
 	}
 }
