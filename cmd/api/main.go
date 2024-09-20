@@ -9,14 +9,17 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"github.com/hvpaiva/greenlight/cmd/api/rest"
+	"github.com/hvpaiva/greenlight/cmd/api/app"
+	"github.com/hvpaiva/greenlight/cmd/api/handler"
 )
 
-func main() {
-	cfg := rest.InitConfig()
-	logger := rest.NewLogger(cfg.Debug)
+const version = "1.0.0"
 
-	db, err := openDB(cfg.DB)
+func main() {
+	cfg := initConfig(version)
+	logger := app.NewLogger(cfg.debug)
+
+	db, err := openDB(cfg.db)
 	if err != nil {
 		logger.Error("database failed to open", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -30,23 +33,24 @@ func main() {
 		}
 	}(db)
 
-	app := rest.NewApplication(db, cfg, logger)
+	a := app.New(logger, cfg.env, cfg.version)
+	h := handler.New(a, db, &cfg.limiter)
 
-	if err := serve(app); err != nil {
+	if err := serve(cfg, a, h); err != nil {
 		logger.Error("server failed to start", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 }
 
-func openDB(dbConfig rest.DB) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dbConfig.DSN)
+func openDB(dbConfig dbConfig) (*sql.DB, error) {
+	db, err := sql.Open("postgres", dbConfig.dsn)
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(dbConfig.MaxOpenConns)
-	db.SetMaxIdleConns(dbConfig.MaxIdleConns)
-	db.SetConnMaxIdleTime(dbConfig.MaxIdleTime)
+	db.SetMaxOpenConns(dbConfig.maxOpenConns)
+	db.SetMaxIdleConns(dbConfig.maxIdleConns)
+	db.SetConnMaxIdleTime(dbConfig.maxIdleTime)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

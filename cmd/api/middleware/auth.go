@@ -1,4 +1,4 @@
-package rest
+package middleware
 
 import (
 	"errors"
@@ -11,21 +11,21 @@ import (
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (a *Application) Authenticate(next http.Handler) http.Handler {
+func (m *Middleware) Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
 
 		authHeader := r.Header.Get("Authorization")
 
 		if authHeader == "" {
-			r = a.contextSetUser(r, data.AnonymousUser)
+			r = m.App.ContextSetUser(r, data.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
 
 		headerParts := strings.Split(authHeader, " ")
 		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			a.HandleUnauthorized(w, r, "invalid or malformed authorization header")
+			m.App.HandleUnauthorized(w, r, "invalid or malformed authorization header")
 			return
 		}
 
@@ -34,59 +34,59 @@ func (a *Application) Authenticate(next http.Handler) http.Handler {
 		v := validator.New()
 
 		if data.ValidateToken(v, token); !v.Valid() {
-			a.HandleUnauthorized(w, r, "invalid or malformed authorization token")
+			m.App.HandleUnauthorized(w, r, "invalid or malformed authorization token")
 			return
 		}
 
-		user, err := a.Models.Users.GetForToken(data.ScopeAuthentication, token)
+		user, err := m.Models.Users.GetForToken(data.ScopeAuthentication, token)
 		if err != nil {
 			switch {
 			case errors.Is(err, data.ErrRecordNotFound):
-				a.HandleUnauthorized(w, r, "invalid or expired authorization token")
+				m.App.HandleUnauthorized(w, r, "invalid or expired authorization token")
 			default:
-				a.HandleError(w, r, err)
+				m.App.HandleError(w, r, err)
 			}
 			return
 		}
 
-		r = a.contextSetUser(r, user)
+		r = m.App.ContextSetUser(r, user)
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-func (a *Application) Authorize(permission string, next httprouter.Handle) httprouter.Handle {
+func (m *Middleware) Authorize(permission string, next httprouter.Handle) httprouter.Handle {
 	fn := func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		user := a.contextGetUser(r)
+		user := m.App.ContextGetUser(r)
 
 		if user.IsAnonymous() {
-			a.HandleUnauthorized(w, r, "authentication required")
+			m.App.HandleUnauthorized(w, r, "authentication required")
 			return
 		}
 
 		if !user.Activated {
-			a.HandleForbidden(w, r, "user not activated")
+			m.App.HandleForbidden(w, r, "user not activated")
 			return
 		}
 
 		next(w, r, param)
 	}
 
-	return a.CheckPermissions(permission, fn)
+	return m.CheckPermissions(permission, fn)
 }
 
-func (a *Application) CheckPermissions(permission string, next httprouter.Handle) httprouter.Handle {
+func (m *Middleware) CheckPermissions(permission string, next httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, param httprouter.Params) {
-		user := a.contextGetUser(r)
+		user := m.App.ContextGetUser(r)
 
-		permissions, err := a.Models.Permission.GetAllForUser(user.ID)
+		permissions, err := m.Models.Permission.GetAllForUser(user.ID)
 		if err != nil {
-			a.HandleError(w, r, err)
+			m.App.HandleError(w, r, err)
 			return
 		}
 
 		if !permissions.Contains(permission) {
-			a.HandleForbidden(w, r, "user does not have the required permission")
+			m.App.HandleForbidden(w, r, "user does not have the required permission")
 			return
 		}
 

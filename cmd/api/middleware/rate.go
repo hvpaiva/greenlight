@@ -1,4 +1,4 @@
-package rest
+package middleware
 
 import (
 	"net"
@@ -7,9 +7,17 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
+	"github.com/hvpaiva/greenlight/cmd/api/app"
 )
 
-func (a *Application) RateLimit(next http.Handler) http.Handler {
+type Limiter struct {
+	Rps     float64
+	Burst   int
+	Enabled bool
+}
+
+func (m *Middleware) RateLimit(next http.Handler) http.Handler {
 	type client struct {
 		limiter  *rate.Limiter
 		lastSeen time.Time
@@ -38,27 +46,27 @@ func (a *Application) RateLimit(next http.Handler) http.Handler {
 	}()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !a.Config.Limiter.Enabled {
+		if !m.Limiter.Enabled {
 			return
 		}
 
 		ip, _, err := net.SplitHostPort(r.RemoteAddr)
 		if err != nil {
-			a.HandleError(w, r, err)
+			m.App.HandleError(w, r, err)
 			return
 		}
 
 		mu.Lock()
 
 		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(a.Config.Limiter.RPS), a.Config.Limiter.Burst)}
+			clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(m.Limiter.Rps), m.Limiter.Burst)}
 		}
 
 		clients[ip].lastSeen = time.Now()
 
 		if !clients[ip].limiter.Allow() {
 			mu.Unlock()
-			a.HandleError(w, r, NewHttpError("rate limit exceeded", http.StatusTooManyRequests))
+			m.App.HandleError(w, r, app.NewError("rate limit exceeded", http.StatusTooManyRequests))
 			return
 		}
 

@@ -11,17 +11,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/hvpaiva/greenlight/cmd/api/rest"
+	"github.com/hvpaiva/greenlight/cmd/api/app"
+	"github.com/hvpaiva/greenlight/cmd/api/handler"
 )
 
-func serve(app *rest.Application) error {
+func serve(c config, a *app.Application, handler *handler.Handler) error {
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", app.Config.Port),
-		Handler:      app.Routes(),
+		Addr:         fmt.Sprintf(":%d", c.port),
+		Handler:      handler.Router(),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		ErrorLog:     slog.NewLogLogger(app.Logger.Handler(), slog.LevelError),
+		ErrorLog:     slog.NewLogLogger(a.Logger.Handler(), slog.LevelError),
 	}
 
 	shutdownError := make(chan error)
@@ -31,7 +32,7 @@ func serve(app *rest.Application) error {
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		s := <-quit
 
-		app.Logger.Info("gracefully shutting down server", "signal", s.String())
+		a.Logger.Info("gracefully shutting down server", "signal", s.String())
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -41,15 +42,15 @@ func serve(app *rest.Application) error {
 			shutdownError <- err
 		}
 
-		app.Wg.Wait()
+		a.Wg.Wait()
 		shutdownError <- nil
 	}()
 
-	app.Logger.Info("starting server",
-		slog.String("version", app.Config.Version),
-		slog.String("Env", app.Config.Env),
+	a.Logger.Info("starting server",
+		slog.String("version", c.version),
+		slog.String("env", c.env),
 		slog.String("addr", srv.Addr),
-		slog.Bool("Debug", app.Config.Debug),
+		slog.Bool("debug", c.debug),
 	)
 
 	err := srv.ListenAndServe()

@@ -1,4 +1,4 @@
-package rest
+package handler
 
 import (
 	"errors"
@@ -7,19 +7,20 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
+	"github.com/hvpaiva/greenlight/cmd/api/app"
 	"github.com/hvpaiva/greenlight/internal/data"
 	"github.com/hvpaiva/greenlight/pkg/ujson"
 	"github.com/hvpaiva/greenlight/pkg/validator"
 )
 
-func (a *Application) creteAuthTokenHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) CreteAuthTokenHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var input struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
 
 	if err := ujson.Read(w, r, &input); err != nil {
-		a.HandleBadRequest(w, r, "error while decoding input", err)
+		h.App.HandleBadRequest(w, r, "error while decoding input", err)
 		return
 	}
 
@@ -29,35 +30,35 @@ func (a *Application) creteAuthTokenHandler(w http.ResponseWriter, r *http.Reque
 	data.ValidatePassword(v, input.Password)
 
 	if !v.Valid() {
-		a.HandleValidationErrors(w, r, v.Errors)
+		h.App.HandleValidationErrors(w, r, v.Errors)
 		return
 	}
 
-	user, err := a.Models.Users.GetByEmail(input.Email)
+	user, err := h.Models.Users.GetByEmail(input.Email)
 	if err != nil {
 		switch {
 		case errors.Is(err, data.ErrRecordNotFound):
-			a.HandleError(w, r, NewHttpErrorWithCause("invalid credentials", http.StatusUnauthorized, err))
+			h.App.HandleError(w, r, app.NewErrorWithCause("invalid credentials", http.StatusUnauthorized, err))
 		default:
-			a.HandleError(w, r, err)
+			h.App.HandleError(w, r, err)
 		}
 		return
 	}
 
 	match, err := user.Password.Matches(input.Password)
 	if err != nil {
-		a.HandleError(w, r, err)
+		h.App.HandleError(w, r, err)
 		return
 	}
 
 	if !match {
-		a.HandleError(w, r, NewHttpError("invalid credentials", http.StatusUnauthorized))
+		h.App.HandleError(w, r, app.NewError("invalid credentials", http.StatusUnauthorized))
 		return
 	}
 
-	token, err := a.Models.Tokens.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
+	token, err := h.Models.Tokens.New(user.ID, 24*time.Hour, data.ScopeAuthentication)
 	if err != nil {
-		a.HandleError(w, r, err)
+		h.App.HandleError(w, r, err)
 		return
 	}
 
@@ -68,7 +69,7 @@ func (a *Application) creteAuthTokenHandler(w http.ResponseWriter, r *http.Reque
 	output.AccessToken = token
 
 	if err = ujson.Write(w, http.StatusCreated, output, nil); err != nil {
-		a.HandleError(w, r, err)
+		h.App.HandleError(w, r, err)
 	}
 
 }

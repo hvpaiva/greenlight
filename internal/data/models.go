@@ -22,8 +22,8 @@ type Models struct {
 	Permission PermissionModel
 }
 
-func NewModel(db *sql.DB) Models {
-	return Models{
+func New(db *sql.DB) *Models {
+	return &Models{
 		Movies:     MovieModel{DB: db},
 		Users:      UserModel{DB: db},
 		Tokens:     TokenModel{DB: db},
