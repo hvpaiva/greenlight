@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
+	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -36,6 +39,8 @@ func main() {
 	a := app.New(logger, cfg.env, cfg.version, cfg.cors.trustedOrigins)
 	h := handler.New(a, db, &cfg.limiter)
 
+	publishMetrics(db, cfg)
+
 	if err := serve(cfg, a, h); err != nil {
 		logger.Error("server failed to start", slog.String("erro", err.Error()))
 		os.Exit(1)
@@ -61,4 +66,22 @@ func openDB(dbConfig dbConfig) (*sql.DB, error) {
 	}
 
 	return db, nil
+}
+
+func publishMetrics(db *sql.DB, c config) {
+	expvar.NewString("version").Set(c.version)
+	expvar.NewString("env").Set(c.env)
+	expvar.NewString("debug_mode").Set(fmt.Sprintf("%v", c.debug))
+
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+
+	expvar.Publish("database", expvar.Func(func() any {
+		return db.Stats()
+	}))
+
+	expvar.Publish("timestamp", expvar.Func(func() any {
+		return time.Now().Unix()
+	}))
 }

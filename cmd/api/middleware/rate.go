@@ -46,31 +46,29 @@ func (m *Middleware) RateLimit(next http.Handler) http.Handler {
 	}()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !m.Limiter.Enabled {
-			return
-		}
+		if m.Limiter.Enabled {
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				erro.Handle(m.App, w, r, erro.ThrowInternalServer("failed to get client IP address", err))
+				return
+			}
 
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			erro.Handle(m.App, w, r, erro.ThrowInternalServer("failed to get client IP address", err))
-			return
-		}
+			mu.Lock()
 
-		mu.Lock()
+			if _, found := clients[ip]; !found {
+				clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(m.Limiter.Rps), m.Limiter.Burst)}
+			}
 
-		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(m.Limiter.Rps), m.Limiter.Burst)}
-		}
+			clients[ip].lastSeen = time.Now()
 
-		clients[ip].lastSeen = time.Now()
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				erro.Handle(m.App, w, r, erro.TooManyRequests)
+				return
+			}
 
-		if !clients[ip].limiter.Allow() {
 			mu.Unlock()
-			erro.Handle(m.App, w, r, erro.TooManyRequests.WithMessage("rate limit exceeded"))
-			return
 		}
-
-		mu.Unlock()
 
 		next.ServeHTTP(w, r)
 	})

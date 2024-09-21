@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"expvar"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -8,6 +9,7 @@ import (
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
 	"github.com/hvpaiva/greenlight/cmd/api/middleware"
 	"github.com/hvpaiva/greenlight/internal/data"
+	"github.com/hvpaiva/greenlight/pkg/uslices"
 )
 
 func (h *Handler) Router() http.Handler {
@@ -27,10 +29,13 @@ func (h *Handler) Router() http.Handler {
 
 	h.register(r, http.MethodPost, "/v1/tokens/authentication", h.creteAuthTokenHandler)
 
+	r.Handler(http.MethodGet, "/v1/debug/vars", expvar.Handler())
+
 	r.NotFound = notFoundFunc(h)
 	r.MethodNotAllowed = methodNotAllowedFunc(h)
 
 	return addMiddlewares(r,
+		h.Middleware.InjectMetric,
 		h.Middleware.EnableCors,
 		h.Middleware.RecoverPanic,
 		h.Middleware.RateLimit,
@@ -41,6 +46,8 @@ func (h *Handler) Router() http.Handler {
 func (h *Handler) register(r *httprouter.Router, method string, path string, handle handlerFunc, middlewares ...middleware.Func) {
 	var aggregated = h.adapt(handle)
 
+	uslices.Revert(middlewares)
+
 	for _, m := range middlewares {
 		aggregated = m(aggregated)
 	}
@@ -50,6 +57,9 @@ func (h *Handler) register(r *httprouter.Router, method string, path string, han
 
 func addMiddlewares(r *httprouter.Router, middlewares ...middleware.Func) http.Handler {
 	var aggregated http.Handler = r
+
+	uslices.Revert(middlewares)
+
 	for _, m := range middlewares {
 		aggregated = m(aggregated)
 	}
