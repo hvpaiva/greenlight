@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"net"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 
 	"github.com/hvpaiva/greenlight/cmd/api/erro"
@@ -47,11 +47,7 @@ func (m *Middleware) RateLimit(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if m.Limiter.Enabled {
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				erro.Handle(m.App, w, r, erro.ThrowInternalServer("failed to get client IP address", err))
-				return
-			}
+			ip := realip.FromRequest(r)
 
 			mu.Lock()
 

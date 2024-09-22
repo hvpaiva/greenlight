@@ -278,11 +278,11 @@ func parseId(r *http.Request) (int64, error) {
 
 	id, err := strconv.ParseInt(param.ByName("id"), 10, 64)
 	if err != nil {
-		return 0, errors.New(fmt.Sprintf("error while parsing id from params: %s", err.Error()))
+		return 0, fmt.Errorf("error while parsing id from params: %s", err.Error())
 	}
 
 	if id < 1 {
-		return 0, errors.New(fmt.Sprintf("id provided is invalid, it should be greater than 0"))
+		return 0, fmt.Errorf("id provided is invalid, it should be greater than 0")
 	}
 
 	return id, nil

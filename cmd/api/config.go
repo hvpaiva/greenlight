@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"os"
 	"strings"
 	"time"
 
@@ -37,7 +36,7 @@ func initConfig(version string) config {
 	flag.StringVar(&cfg.env, "env", "development", "Environment (development|staging|production)")
 	flag.BoolVar(&cfg.debug, "debug", false, "Enable debug mode")
 
-	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgreSQL dsn")
+	flag.StringVar(&cfg.db.dsn, "db-dsn", "", "PostgreSQL dsn")
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.DurationVar(&cfg.db.maxIdleTime, "db-max-idle-time", 15*time.Minute, "PostgreSQL max connection idle time")
