@@ -14,9 +14,12 @@ import (
 
 	"github.com/hvpaiva/greenlight/cmd/api/app"
 	"github.com/hvpaiva/greenlight/cmd/api/handler"
+	"github.com/hvpaiva/greenlight/pkg/vcs"
 )
 
-const version = "1.0.0"
+var (
+	version = vcs.Version()
+)
 
 func main() {
 	cfg := initConfig(version)
